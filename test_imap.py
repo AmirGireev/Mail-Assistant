@@ -3,10 +3,10 @@ from email.header import decode_header
 import imaplib
 
 # Configuration
-IMAP_SERVER = "imap.gmail.com"  # e.g., imap.gmail.com, outlook.office365.com
+IMAP_SERVER = "imap.gmail.com"  
 IMAP_PORT = 993
 EMAIL_ACCOUNT = "amir.gireev05@gmail.com"
-APP_PASSWORD = "jjag tyqm ctor eoly"  # Use an App Password, not normal password!
+APP_PASSWORD = "jjag tyqm ctor eoly"  
 SINCE_DATE = "01-Nov-2026"  # Format: DD-Mon-YYYY (e.g., 01-Nov-2026)
 
 
