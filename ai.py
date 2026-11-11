@@ -163,7 +163,7 @@ Rule: {SENSITIVITY[sensitivity]}
 NOT important, always exclude: newsletters, marketing and promotions, social-media and job-platform notifications
 (LinkedIn, Xing, Indeed, job alerts, "someone viewed your profile"), automatic digests, verification / confirmation /
 login codes, routine account and security notifications (Google, Apple, Microsoft: "security alert", "new sign-in",
-"password changed"), order or shipping updates that need no action, receipts without action.
+"password changed").
 Important: mails from a real person to the user, appointments, deadlines, bills and payment demands, authorities,
 school / university / work, contracts, and real fraud such as a suspicious payment.
 An automated mail that needs no action from the user is NOT important. If a mail from a real person is unclear, mark it important.
