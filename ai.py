@@ -18,13 +18,13 @@ PROVIDERS = {
 # filter rules
 SENSITIVITY = {
     "strict": "Only keep mails that clearly require action or contain time-sensitive/financial/legal/personal information.",
-    "normal": "Keep mails from real people, appointments, deadlines, bills, authorities, school/work, security alerts, deliveries needing action.",
+    "normal": "Keep mails from real people, appointments, deadlines, bills, authorities, school/work, deliveries needing action.",
     "relaxed": "Keep everything except obvious advertising and automated notifications.",
 }
 
 # noise senders
-NOISE_SENDERS = ("linkedin.com", "xing.com", "indeed.com", "glassdoor.com", "stepstone.de",
-                 "facebookmail.com", "instagram.com", "pinterest.com", "quora.com", "medium.com")
+NOISE_SENDERS = ("accounts.google.com", "linkedin.com", "xing.com", "indeed.com", "glassdoor.com",
+                 "stepstone.de", "facebookmail.com", "instagram.com", "pinterest.com", "quora.com", "medium.com")
 
 # code mails
 CODE_WORDS = re.compile(
@@ -162,9 +162,10 @@ def analyse_batch(cl, mails, sensitivity="normal", today_iso=""):
 Rule: {SENSITIVITY[sensitivity]}
 NOT important, always exclude: newsletters, marketing and promotions, social-media and job-platform notifications
 (LinkedIn, Xing, Indeed, job alerts, "someone viewed your profile"), automatic digests, verification / confirmation /
-login codes, order or shipping updates that need no action, receipts without action.
+login codes, routine account and security notifications (Google, Apple, Microsoft: "security alert", "new sign-in",
+"password changed"), order or shipping updates that need no action, receipts without action.
 Important: mails from a real person to the user, appointments, deadlines, bills and payment demands, authorities,
-school / university / work, contracts, and real security problems (hacked account, suspicious payment).
+school / university / work, contracts, and real fraud such as a suspicious payment.
 An automated mail that needs no action from the user is NOT important. If a mail from a real person is unclear, mark it important.
 Answer in the language of each email.
 Return JSON: {{"emails":[{{
