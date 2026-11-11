@@ -15,9 +15,10 @@ import notifier
 import pipeline
 import telegram_bot
 
+# page setup
 st.set_page_config(page_title="Mail Assistant", page_icon="📬")
 
-# ---------------------------------------------------------------- constants
+# mail providers
 PRESETS = {
     "Gmail": "imap.gmail.com",
     "GMX": "imap.gmx.net",
@@ -29,6 +30,8 @@ PRESETS = {
     "Outlook / Hotmail": "outlook.office365.com",
     "Other": "",
 }
+
+# provider hints
 HINTS = {
     "Gmail": "Turn on 2-step verification, then create an **App password** (Google Account → Security).",
     "GMX": "Settings → enable POP3/IMAP access. Use an app password if 2FA is on.",
@@ -39,6 +42,8 @@ HINTS = {
     "T-Online": "Use the special 'email password' from the T-Online customer center.",
     "Other": "Check your provider's IMAP help page for the host name.",
 }
+
+# choice lists
 FREQUENCIES = {"daily": "Daily", "every_3_days": "Every 3 days", "weekly": "Weekly"}
 WEEKDAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 MODES = {"short": "Short summary of everything", "per_email": "One sentence per important email"}
@@ -46,6 +51,7 @@ CHANNELS = {"whatsapp": "WhatsApp (CallMeBot)", "telegram": "Telegram"}
 CALENDARS = {"google": "Google Calendar", "apple": "Apple Calendar (iPhone / Mac)"}
 TIMEZONES = sorted(available_timezones())
 
+# whatsapp guide
 STEP4A = """**WhatsApp via CallMeBot (done once, from your own phone)**
 
 1. Open https://www.callmebot.com and copy the **current bot phone number** (it has changed before).
@@ -55,6 +61,7 @@ STEP4A = """**WhatsApp via CallMeBot (done once, from your own phone)**
 3. Wait for the reply with your **API key** (nothing after 2 minutes? try again after 24 hours).
 4. Enter your number (with country code, e.g. +49...) and the API key here."""
 
+# telegram guide
 STEP4B = """**Telegram (free, official)**
 
 1. Install Telegram on your phone.
@@ -62,9 +69,26 @@ STEP4B = """**Telegram (free, official)**
 3. Come back here and click **"2. I pressed Start"**. That's it."""
 
 
-# ---------------------------------------------------------------- calendar page (public, no login)
+# password field
+def secret_input(label, saved, key):
+    return st.text_input(label, type="password", key=key,
+                         placeholder="•••••••• saved (leave empty to keep)" if saved else "")
+
+
+# store secret
+def autosave_secret(user, attr, value):
+    if value:
+        # skip unchanged
+        try:
+            same = crypto.decrypt(getattr(user, attr)) == value
+        except Exception:
+            same = False
+        if not same:
+            setattr(user, attr, crypto.encrypt(value))
+
+
+# calendar page
 def calendar_page(token):
-    """Opened from the 'Add to calendar' link in the summary (Apple Calendar)."""
     st.title("📅 Add to calendar")
     try:
         ev = calendar_links.decode_event(token)
@@ -82,30 +106,15 @@ def calendar_page(token):
     st.link_button("Use Google Calendar instead", calendar_links.google_link(ev))
 
 
-# ---------------------------------------------------------------- helpers
-def secret_input(label, saved, key):
-    """Password-style field. Never shows the stored secret, returns '' when left empty."""
-    return st.text_input(label, type="password", key=key,
-                         placeholder="•••••••• saved (leave empty to keep)" if saved else "")
-
-
-def autosave_secret(user, attr, value):
-    """Encrypts and stores a typed secret, but only when it is new."""
-    if value:
-        try:
-            same = crypto.decrypt(getattr(user, attr)) == value
-        except Exception:
-            same = False
-        if not same:
-            setattr(user, attr, crypto.encrypt(value))
-
-
+# login page
 def login_box():
     st.title("📬 Mail Assistant")
     tab_in, tab_up = st.tabs(["Log in", "Register"])
 
+    # log in
     with tab_in:
-        with st.form("login_form"):                       # a form = pressing Enter submits it
+        # enter submits
+        with st.form("login_form"):
             u = st.text_input("Username")
             p = st.text_input("Password", type="password")
             go = st.form_submit_button("Log in")
@@ -118,6 +127,7 @@ def login_box():
                 else:
                     st.error("Wrong username or password")
 
+    # register
     with tab_up:
         with st.form("register_form"):
             u = st.text_input("Choose a username")
@@ -141,33 +151,36 @@ def login_box():
                     st.error("That username is taken")
 
 
-# ---------------------------------------------------------------- entry points
+# calendar route
 cal_token = st.query_params.get("cal")
 if cal_token:
     calendar_page(cal_token)
     st.stop()
 
+# login gate
 if "uid" not in st.session_state:
     login_box()
     st.stop()
 
 with db.Session() as s:
+    # load user
     user = s.get(db.User, st.session_state.uid)
-    if user is None:                      # account was deleted
+    if user is None:
         st.session_state.clear()
         st.rerun()
 
+    # header
     head, out = st.columns([4, 1])
     head.title("📬 Mail Assistant")
     if out.button("Log out"):
-        st.session_state.clear()          # also clears the writing-style text of this user
+        st.session_state.clear()
         st.rerun()
     st.caption(f"Logged in as **{user.username}**. Everything you change is saved automatically.")
 
     tab_mail, tab_notify, tab_set, tab_style, tab_prev = st.tabs(
         ["Mailbox", "Notifications", "Settings", "My writing style", "Preview"])
 
-    # ============================================================ Mailbox
+    # ---------------------------------------------------------- mailbox
     with tab_mail:
         names = list(PRESETS)
         current = next((n for n in names if PRESETS[n] and PRESETS[n] == user.imap_host),
@@ -179,20 +192,22 @@ with db.Session() as s:
         elif provider in HINTS:
             st.info(HINTS[provider])
 
+        # host choice
         if provider == "Other":
             host = st.text_input("IMAP host", value=user.imap_host)
         else:
-            host = PRESETS[provider]              # known provider: nothing to type, nothing to show
+            host = PRESETS[provider]
         address = st.text_input("Email address / login", value=user.imap_user)
         new_pw = secret_input("App password", user.imap_password_enc, "imap_pw")
 
-        user.imap_port = 993                      # always the standard secure IMAP port
+        # auto save
+        user.imap_port = 993
         user.imap_user = address.strip()
         if address.strip():
             user.imap_host = host.strip()
         autosave_secret(user, "imap_password_enc", new_pw)
 
-    # ============================================================ Notifications
+    # ---------------------------------------------------- notifications
     with tab_notify:
         keys = list(CHANNELS)
         user.notify_channel = st.radio("Send my summary via", keys, format_func=CHANNELS.get,
@@ -202,14 +217,16 @@ with db.Session() as s:
         with st.expander("How do I set this up?"):
             st.markdown(STEP4A if user.notify_channel == "whatsapp" else STEP4B)
 
+        # whatsapp
         if user.notify_channel == "whatsapp":
             user.wa_phone = st.text_input("WhatsApp number (with country code, e.g. +49...)",
                                           value=user.wa_phone).strip()
             autosave_secret(user, "wa_apikey_enc", secret_input("CallMeBot API key", user.wa_apikey_enc, "wa_key"))
+        # telegram
         else:
             if not user.tg_link_code:
                 user.tg_link_code = secrets.token_urlsafe(8)
-                s.commit()                          # keep the same code on every rerun
+                s.commit()
             try:
                 st.link_button("1. Open Telegram and press Start", telegram_bot.link_for(user.tg_link_code))
             except Exception as e:
@@ -229,10 +246,11 @@ with db.Session() as s:
             if user.tg_chat_id:
                 st.caption("✅ Telegram is connected")
 
-    # ============================================================ Settings
+    # ------------------------------------------------------- settings
     with tab_set:
         user.enabled = st.toggle("Assistant on", value=user.enabled)
 
+        # schedule
         freq_keys = list(FREQUENCIES)
         user.frequency = st.selectbox("How often?", freq_keys, format_func=FREQUENCIES.get,
                                       index=freq_keys.index(user.frequency)
@@ -244,6 +262,7 @@ with db.Session() as s:
         tz_index = TIMEZONES.index(user.timezone) if user.timezone in TIMEZONES else TIMEZONES.index("Europe/Berlin")
         user.timezone = st.selectbox("Time zone", TIMEZONES, index=tz_index)
 
+        # summary style
         mode_keys = list(MODES)
         user.summary_mode = st.radio("Format", mode_keys, format_func=MODES.get,
                                      index=mode_keys.index(user.summary_mode)
@@ -253,11 +272,13 @@ with db.Session() as s:
         st.caption("Strict = only what clearly needs action. Relaxed = everything except obvious ads. "
                    "If you are afraid of missing something, choose relaxed.")
 
+        # feature toggles
         user.feat_attachments = st.toggle("Read attachments", value=user.feat_attachments)
         user.feat_drafts = st.toggle("Write reply drafts in my style", value=user.feat_drafts)
         if user.feat_drafts and not user.style_profile:
             st.warning("Drafts need your writing style. Go to the 'My writing style' tab first.")
 
+        # calendar choice
         user.feat_calendar = st.toggle("Calendar links", value=user.feat_calendar)
         if user.feat_calendar:
             cal_keys = list(CALENDARS)
@@ -272,6 +293,7 @@ with db.Session() as s:
         user.feat_send_if_empty = st.toggle("Message me even if nothing is important",
                                             value=user.feat_send_if_empty)
 
+        # ai model
         st.divider()
         prov_keys = list(ai.PROVIDERS)
         user.ai_provider = st.selectbox("AI model", prov_keys, format_func=ai.PROVIDERS.get,
@@ -286,11 +308,12 @@ with db.Session() as s:
                 "Own Gemini API key (optional, otherwise the shared key is used)",
                 user.gemini_key_enc, "gk"))
 
-    # ============================================================ Writing style
+    # --------------------------------------------------- writing style
     with tab_style:
         st.write("The assistant reads about 25 of your sent emails once and writes down how you write. "
                  "You can correct the result below. Only this description is stored, not your emails.")
         st.session_state.setdefault("style_text", user.style_profile)
+        # learn style
         if st.button("Learn my style from my Sent folder"):
             try:
                 with st.spinner("Reading your sent mails..."):
@@ -308,16 +331,17 @@ with db.Session() as s:
         st.text_area("My writing style (editable)", key="style_text", height=260)
         user.style_profile = st.session_state["style_text"]
 
-    # ============================================================ Preview
+    # ----------------------------------------------------------- preview
     with tab_prev:
         st.write("Creates a summary right now from the same time window the next real run would use. "
                  "It does not use up that run and does not write any drafts.")
         also_send = st.checkbox("Also send it to me via my notification channel")
         if st.button("Create a summary now"):
-            s.commit()                          # make sure the latest settings are used
+            # save first
+            s.commit()
             try:
                 with st.spinner("Reading and summarising your mails... this can take a minute"):
-                    text = pipeline.run_for_user(user, s, preview=True)
+                    text = pipeline.run_for_user(user, preview=True)
                 if text:
                     with st.container(border=True):
                         st.markdown(text.replace("\n", "  \n"))
@@ -329,7 +353,7 @@ with db.Session() as s:
             except Exception as e:
                 st.error(f"Preview failed: {e}")
 
-    # ============================================================ Danger zone
+    # ------------------------------------------------------ delete account
     with st.expander("Delete my account and data"):
         st.write("This removes your account, saved settings and stored passwords/keys. "
                  "To also revoke access at the source, delete the app password in your mail provider.")
@@ -340,4 +364,5 @@ with db.Session() as s:
                 st.session_state.clear()
                 st.rerun()
 
-    s.commit()                                  # auto-save: everything changed above is stored
+    # auto save
+    s.commit()
