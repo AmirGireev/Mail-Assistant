@@ -79,7 +79,7 @@ def format_digest(u, important, drafts, cl):
     lines = ["📬 *Mail summary*"]
 
     # Body based on user mode
-    if u.mode == "short":
+    if u.summary_mode == "short":
         # Assuming ai.short_summary takes the client and the list of emails
         lines.append(ai.short_summary(cl, important))
         
@@ -87,15 +87,12 @@ def format_digest(u, important, drafts, cl):
         for mail in important:
             if "cal_link" in mail:
                 lines.append(f"📅 Add to calendar: {mail['cal_link']}")
-                
-    elif u.mode == "per_email":
+
+    elif u.summary_mode == "per_email":
         for mail in important:
-            sender = mail.get("sender", "Unknown")
-            # Using 'sentence' or falling back to 'summary' just in case
-            sentence = mail.get("sentence", mail.get("summary", "")) 
-            
+            sender   = mail.get("sender_name", "Unknown")
+            sentence = mail.get("one_sentence", "")
             lines.append(f"*{sender}*: {sentence}")
-            
             if "cal_link" in mail:
                 lines.append(f"📅 Add to calendar: {mail['cal_link']}")
 
