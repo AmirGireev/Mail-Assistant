@@ -43,6 +43,7 @@ class User(Base):
     feat_attachments: Mapped[bool] = mapped_column(Boolean, default=True)
     feat_drafts: Mapped[bool] = mapped_column(Boolean, default=False)
     feat_calendar: Mapped[bool] = mapped_column(Boolean, default=True)
+    calendar_type: Mapped[str] = mapped_column(String(20), default="google")   # google | apple
     feat_send_if_empty: Mapped[bool] = mapped_column(Boolean, default=False)
 
     style_profile: Mapped[str] = mapped_column(Text, default="")

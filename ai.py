@@ -97,7 +97,6 @@ def get_provider(u):
     return GeminiProvider(crypto.decrypt(u.gemini_key_enc) or None)
 
 
-
 SENSITIVITY = {
   "strict":  "Only keep mails that clearly require action or contain time-sensitive/financial/legal/personal information.",
   "normal":  "Keep mails from real people, appointments, deadlines, bills, authorities, school/work, security alerts, deliveries needing action.",
@@ -127,15 +126,12 @@ Emails: {json.dumps(items, ensure_ascii=False)}"""
     return cl.json(prompt)["emails"]
 
 
-
 def short_summary(cl, important):
     lines = "\n".join(f"- {m['sender_name']}: {m['one_sentence']}" for m in important)
-    return cl.text(f"""Write a short, friendly WhatsApp-style overview (max 5 sentences, same language as the notes)
-of these important emails. Mention what needs action first. No greeting, no markdown headings.
+    return cl.text(f"""Write a short overview (max 5 sentences, same language as the notes) of these important emails.
+Put every sentence on its own line. Mention what needs action first.
+No greeting, no bullet characters, no markdown headings.
 {lines}""")
-
-
-
 
 
 def build_style_profile(cl, samples):

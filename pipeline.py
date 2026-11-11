@@ -4,6 +4,41 @@ import imap_client, attachments, ai, calendar_links, crypto
 
 INTERVAL_DAYS = {"daily": 1, "every_3_days": 3, "weekly": 7}
 
+
+def _bullet(text, clean=False):
+    if clean:                                               # remove bullets the AI may have added itself
+        text = text.strip().lstrip("-•*– ")
+    return "• " + text.strip()
+
+
+def format_digest(u, important, drafts, cl):
+    """Every sentence becomes its own bullet point, so the message is easy to scan."""
+    lines = ["📬 *Mail summary*", ""]
+    if not important:
+        return "\n".join(lines + ["• Nothing important today 🎉"])
+
+    if u.summary_mode == "short":
+        for sentence in ai.short_summary(cl, important).splitlines():
+            if sentence.strip():
+                lines.append(_bullet(sentence, clean=True))
+        events = [r for r in important if r.get("cal_link")]
+        if events:
+            lines += ["", "📅 *Add to calendar*"]
+            for r in events:
+                lines.append(f"• {r['event']['title']}")
+                lines.append(r["cal_link"])                  # link alone on its line = tappable
+    else:
+        for r in important:
+            lines.append(_bullet(f"*{r['sender_name']}*: {r['one_sentence']}"))
+            if r.get("cal_link"):
+                lines.append("   📅 Add to calendar:")
+                lines.append("   " + r["cal_link"])
+
+    if drafts:
+        lines += ["", f"✍️ {drafts} reply draft(s) are waiting in your Drafts folder."]
+    return "\n".join(lines)
+
+
 def run_for_user(u, session, preview=False):
     now = datetime.now(timezone.utc)
     since = u.last_run or now - timedelta(days=INTERVAL_DAYS[u.frequency])
@@ -40,9 +75,7 @@ def run_for_user(u, session, preview=False):
     # 3. calendar links (optional)
     for r in important:
         if u.feat_calendar and r.get("event"):
-            ev = r["event"]
-            r["cal_link"] = calendar_links.gcal_link(ev["title"], ev["start"], ev.get("end"),
-                                                     ev.get("all_day", False), ev.get("location", ""))
+            r["cal_link"] = calendar_links.event_link(u.calendar_type, r["event"])   # Google or Apple, per user
 
     # 4. reply drafts (optional)
     drafts = 0
@@ -58,8 +91,6 @@ def run_for_user(u, session, preview=False):
     # 5. build the message
     text = format_digest(u, important, drafts, cl)
 
-    
-
     # 6. log the real token usage (numbers only, never email content)
     print(f"{u.username}: model={cl.name} tokens_in={cl.tokens_in} tokens_out={cl.tokens_out}")
 
@@ -67,38 +98,3 @@ def run_for_user(u, session, preview=False):
         text = None
     m.logout()
     return text      # caller sends it via the user's chosen channel (or shows it in the website when preview=True)
-
-def format_digest(u, important, drafts, cl):
-    # If there are no important emails
-    if not important:
-        if u.feat_send_if_empty:
-            return "Nothing important today 🎉."
-        return None
-
-    # Header
-    lines = ["📬 *Mail summary*"]
-
-    # Body based on user mode
-    if u.summary_mode == "short":
-        # Assuming ai.short_summary takes the client and the list of emails
-        lines.append(ai.short_summary(cl, important))
-        
-        # In short mode, we still append any calendar links found
-        for mail in important:
-            if "cal_link" in mail:
-                lines.append(f"📅 Add to calendar: {mail['cal_link']}")
-
-    elif u.summary_mode == "per_email":
-        for mail in important:
-            sender   = mail.get("sender_name", "Unknown")
-            sentence = mail.get("one_sentence", "")
-            lines.append(f"*{sender}*: {sentence}")
-            if "cal_link" in mail:
-                lines.append(f"📅 Add to calendar: {mail['cal_link']}")
-
-    # Footer for Drafts
-    if drafts > 0:
-        # Using a dynamic variable {drafts} so it adapts to the actual count
-        lines.append(f"✍️ {drafts} reply drafts are waiting in your Drafts folder.")
-
-    return "\n".join(lines)
