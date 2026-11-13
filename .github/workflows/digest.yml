@@ -1,8 +1,8 @@
 name: digest
 on:
   schedule:
-    - cron: "*/30 * * * *"      # every 30 minutes (UTC); the script decides who is due
-  workflow_dispatch:             # lets you start it manually from the GitHub "Actions" tab
+    - cron: "7,37 * * * *"      # every 30 minutes min
+  workflow_dispatch:            
 jobs:
   run:
     runs-on: ubuntu-latest
